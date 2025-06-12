@@ -161,7 +161,7 @@ export default function App() {
 
   const shoot = async () => {
     if (hitIdx !== null || names.length === 0) return;
-    const audio = new Audio("/whistle.mp3");
+    const audio = new Audio(`${import.meta.env.BASE_URL}whistle.mp3`);
     audio.play();
 
     const idx = Math.floor(Math.random() * names.length);
@@ -169,7 +169,7 @@ export default function App() {
     setArrowAnim(true);
   
     setTimeout(async () => {
-      const se = new Audio("arrow.mp3"); // 하나로 통합된 효과음
+      const se = new Audio(`${import.meta.env.BASE_URL}arrow.mp3`);
       se.volume = 0.6;
       se.play();
       
@@ -271,7 +271,7 @@ export default function App() {
         onClick={shoot}
         title="キューピッドをクリックして矢を放とう！"
       >
-        <img src="/cupid.png" alt="キューピッド" style={{ width: cupidWidth, height: cupidHeight, objectFit: "contain", pointerEvents: "none", userSelect: "none" }} draggable={false} />
+        <img src={`${import.meta.env.BASE_URL}cupid.png`} alt="キューピッド" style={{ width: cupidWidth, height: cupidHeight, objectFit: "contain", pointerEvents: "none", userSelect: "none" }} draggable={false} />
       </motion.div>
 
       <div style={{ position: "fixed", left: 16, bottom: 24, zIndex: 10 }}>

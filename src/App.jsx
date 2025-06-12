@@ -6,20 +6,20 @@ import HistoryPanel from "./HistoryPanel";
 import { fetchNames, addName, deleteName } from "./fireNames";
 import { clearAllHistory } from "./fireHistory";
 
-function makeBalloonPositions(count) {
+export function makeBalloonPositions(count) {
   return Array.from({ length: count }).map(() => ({
     top: `${18 + Math.random() * 25}%`,
     left: `${9 + Math.random() * 74}%`
   }));
 }
 
-const balloonColors = [
-  "#FF4F8B", "#57A5FF", "#FFD93D", "#64E291",
-  "#FF7B54", "#B084CC", "#FFA41B", "#4ECDC4",
-  "#FFD6E0", "#F9D923", "#A1E3D8", "#E07A5F", "#A3D8F4"
+export const balloonColors = [
+  "#FFDBDB", "#B4E2FF", "#FFF1B8", "#D4F8E8",
+  "#FFCEC7", "#D6C8FF", "#FFF6C3", "#CAF0F8",
+  "#FFE8F0", "#FBE7C6", "#C9F9D8", "#FFD5EC", "#B6E5FF"
 ];
 
-function BalloonSVG({ color = "#FF4F8B" }) {
+export function BalloonSVG({ color = "#FF4F8B" }) {
   return (
     <svg width="80" height="160" viewBox="0 0 80 160" fill="none">
       <ellipse cx="40" cy="48" rx="32" ry="40" fill={color} />
@@ -31,7 +31,7 @@ function BalloonSVG({ color = "#FF4F8B" }) {
   );
 }
 
-function Note({ name, onClose }) {
+export function Note({ name, onClose }) {
   return (
     <motion.div
       initial={{ scale: 0, opacity: 0 }}
@@ -43,12 +43,12 @@ function Note({ name, onClose }) {
         top: "38%",
         left: "50%",
         transform: "translate(-50%, -50%)",
-        background: "#fffbe7",
+        background: "#FFF0F5",
         padding: "2rem 3rem",
         borderRadius: "1rem",
         fontSize: "2.5rem",
         fontWeight: 600,
-        color: "#C13D6E",
+        color: "#A05270",
         boxShadow: "0 4px 32px rgba(0,0,0,0.19)",
         zIndex: 100
       }}
@@ -60,45 +60,56 @@ function Note({ name, onClose }) {
   );
 }
 
-function CuteArrowSVG() {
-  return (
-    <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
-      <rect x="6" y="10" width="28" height="4" rx="2" fill="#FFB6C1" />
-      <ellipse cx="7" cy="12" rx="4" ry="4" fill="#87CEEB" />
-      <ellipse cx="44" cy="12" rx="5" ry="5" fill="#FF6381" />
-      <path d="M43,12 Q47,14 44,17 Q41,14 43,12" fill="#FF6381" />
-    </svg>
-  );
-}
-
-function Arrow({ start, end, show }) {
+export function Arrow({ start, end, show }) {
   if (!show) return null;
-  const angle = Math.atan2(end.y - start.y, end.x - start.x);
+  const angle = Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
+
   return (
     <motion.div
-      initial={{ x: start.x, y: start.y, rotate: angle * 180 / Math.PI }}
-      animate={{ x: end.x, y: end.y, rotate: angle * 180 / Math.PI }}
-      transition={{ duration: 3, ease: "easeInOut" }}
+      initial={{ x: start.x, y: start.y, rotate: angle, opacity: 1 }}
+      animate={{ x: end.x, y: end.y, rotate: angle, opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 2.5, ease: "easeOut" }}
       style={{
         position: "absolute",
         left: 0,
         top: 0,
         width: 48,
         height: 24,
-        pointerEvents: "none",
-        zIndex: 1000
+        zIndex: 1000,
+        pointerEvents: "none"
       }}
     >
-      <CuteArrowSVG />
+      <img
+        src={`${import.meta.env.BASE_URL}arrow.png`}
+        alt="arrow"
+        style={{
+          width: "100%",
+          height: "auto",
+          objectFit: "contain",
+          transformOrigin: "left center"
+        }}
+        onError={(e) => {
+          e.target.style.display = "none";
+          console.warn("arrow.png 이미지가 로드되지 않았습니다.");
+        }}
+      />
     </motion.div>
   );
 }
 
 export default function App() {
+  const cupidRef = useRef(null);
+  const [showEditor, setShowEditor] = useState(true);
+  const [hideTimer, setHideTimer] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [bgmSrc] = useState(`${import.meta.env.BASE_URL}whistle.mp3`);
   const [names, setNames] = useState([]);
   const [balloonPositions, setBalloonPositions] = useState([]);
   const [hitIdx, setHitIdx] = useState(null);
   const bgmRef = useRef(null);
+  const hasPlayedRef = useRef(false);
+  const [volume, setVolume] = useState(0.6);
   const [showNote, setShowNote] = useState(false);
   const [arrowAnim, setArrowAnim] = useState(false);
   const [history, setHistory] = useState([]);
@@ -123,6 +134,28 @@ export default function App() {
     setBalloonPositions(makeBalloonPositions(names.length));
   }, [names.length]);
 
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      const nearRight = window.innerWidth - e.clientX < 100 && e.clientY < 300;
+      if (nearRight) {
+        if (hideTimer) clearTimeout(hideTimer);
+        setShowEditor(true);
+      }
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [hideTimer]);
+
+  const handleMouseEnterEditor = () => {
+    if (hideTimer) clearTimeout(hideTimer);
+    setShowEditor(true);
+  };
+
+  const handleMouseLeaveEditor = () => {
+    const timer = setTimeout(() => setShowEditor(false), 1000);
+    setHideTimer(timer);
+  };
+
   const handleAddName = async (nameStr) => {
     const newDoc = await addName(nameStr);
     setNames(prev => [...prev, { id: newDoc.id, name: nameStr }]);
@@ -140,29 +173,35 @@ export default function App() {
   const handleClearHistory = async () => {
     const confirmed = window.confirm("すべての履歴を削除しますか？");
     if (!confirmed) return;
-  
     await clearAllHistory();
-    setHistory([]); // 화면에서도 지우기
-  };  
+    setHistory([]);
+  };
 
   const handleDeleteName = async (id) => {
     await deleteName(id);
     setNames(prev => prev.filter(n => n.id !== id));
   };
 
-  const getCupidXY = () => ({
-    x: window.innerWidth / 2,
-    y: window.innerHeight - 90
-  });
+  const getCupidXY = () => {
+    const rect = cupidRef.current?.getBoundingClientRect();
+    return rect
+      ? { x: rect.left + rect.width * 0.2, y: rect.top + rect.height * 0.4 }
+      : { x: window.innerWidth / 2, y: window.innerHeight - 100 };
+  };
+
   const getBalloonXY = (idx) => {
-    if (!balloonRefs.current[idx]) return { x: 300, y: 100 };
-    const rect = balloonRefs.current[idx].getBoundingClientRect();
-    return { x: rect.left + rect.width / 2, y: rect.top + 30 };
+    const el = balloonRefs.current[idx];
+    if (!el) return { x: 300, y: 100 };
+    const rect = el.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 4
+    };
   };
 
   const shoot = async () => {
     if (hitIdx !== null || names.length === 0) return;
-  
+
     if (!bgmRef.current) {
       const bgm = new Audio(`${import.meta.env.BASE_URL}whistle.mp3`);
       bgm.loop = true;
@@ -171,19 +210,19 @@ export default function App() {
         await bgm.play();
         bgmRef.current = bgm;
       } catch (err) {
-        console.warn("BGM失敗:", err);
+        console.warn("BGM 실패", err);
       }
     }
-  
-    const se = new Audio(`${import.meta.env.BASE_URL}arrow.mp3`);
-    se.volume = 0.6;
-    se.play();
-  
+
     const idx = Math.floor(Math.random() * names.length);
     setHitIdx(idx);
     setArrowAnim(true);
-  
+
     setTimeout(async () => {
+      const se = new Audio(`${import.meta.env.BASE_URL}arrow.mp3`);
+      se.volume = 0.6;
+      se.play();
+
       setArrowAnim(false);
       setShowNote(true);
       await addHistory(names[idx]);
@@ -204,20 +243,46 @@ export default function App() {
     <div style={{
       width: "100vw",
       height: "100vh",
-      background: "linear-gradient(#87ceeb 0%, #fff 100%)",
+      background: "linear-gradient(#FFFBFC 0%, #FDEFF4 100%)",
       overflow: "hidden",
       position: "relative"
     }}>
-      <div style={{ position: "absolute", top: 12, right: 24, zIndex: 10 }}>
-      <NameListEditor onAddName={handleAddName}onClear={handleClearAll}onClearHistory={handleClearHistory}/>
+      <motion.div
+        onMouseEnter={handleMouseEnterEditor}
+        onMouseLeave={handleMouseLeaveEditor}
+        initial={{ opacity: 1, x: 0 }}
+        animate={showEditor ? { opacity: 1, x: 0 } : { opacity: 0, x: 100 }}
+        transition={{ duration: 0.4 }}
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 24,
+          zIndex: 10,
+          background: "rgba(255, 250, 255, 0.6)",
+          padding: "16px",
+          borderRadius: "16px",
+          border: "2px solid #F6D5E1",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
+          pointerEvents: showEditor ? "auto" : "none"
+        }}
+      >
+        <NameListEditor onAddName={handleAddName} onClear={handleClearAll} onClearHistory={handleClearHistory} />
         {names.map(n => (
           <div key={n.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
-              <span style={{fontSize: "1rem",marginRight: "3rem",flex: 1,textAlign: "right",display: "inline-block", fontFamily:"sans-serif"}}> {n.name}
-              </span>
-            <button onClick={() => handleDeleteName(n.id)} style={{ background: "#ccc", border: "none", borderRadius: "4px", padding: "2px 8px", cursor: "pointer" }}>削除</button>
+            <span style={{ fontSize: "1rem", marginRight: "3rem", flex: 1, textAlign: "right", display: "inline-block", fontFamily: "sans-serif" }}>{n.name}</span>
+            <button onClick={() => handleDeleteName(n.id)} style={{
+              background: "#FEC8D8",
+              color: "#7A4F5C",
+              border: "none",
+              borderRadius: "8px",
+              padding: "4px 10px",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: 600
+            }}>削除</button>
           </div>
         ))}
-      </div>
+      </motion.div>
 
       {names.length === 0 ? (
         <div style={{ textAlign: "center", marginTop: "6rem", fontSize: "2.2rem", color: "#b1558c", fontWeight: "bold", letterSpacing: "0.05em", textShadow: "0 1px 4px #fff, 0 1px 8px #e5e5f5" }}>
@@ -246,7 +311,7 @@ export default function App() {
               rotate: [0, -3, 3, 0]
             }}
             transition={hitIdx === i ? {
-              duration: 1.2,
+              duration: 3.0,
               times: [0, 0.6, 1],
               ease: "easeIn"
             } : {
@@ -261,6 +326,8 @@ export default function App() {
       )}
 
       <Arrow show={arrowAnim && hitIdx !== null} start={arrowStart} end={arrowEnd} />
+
+
 
       <motion.div
         style={{
@@ -282,7 +349,7 @@ export default function App() {
         onClick={shoot}
         title="キューピッドをクリックして矢を放とう！"
       >
-        <img src={`${import.meta.env.BASE_URL}cupid.png`} alt="キューピッド" style={{ width: cupidWidth, height: cupidHeight, objectFit: "contain", pointerEvents: "none", userSelect: "none" }} draggable={false} />
+        <img ref={cupidRef} src={`${import.meta.env.BASE_URL}cupid.png`} alt="キューピッド" style={{ width: cupidWidth, height: cupidHeight, objectFit: "contain", pointerEvents: "none", userSelect: "none" }} draggable={false} />
       </motion.div>
 
       <div style={{ position: "fixed", left: 16, bottom: 24, zIndex: 10 }}>
@@ -293,7 +360,110 @@ export default function App() {
         {showNote && hitIdx !== null && <Note name={names[hitIdx].name} onClose={handleCloseNote} />}
       </AnimatePresence>
 
-      <div style={{ position: "absolute", left: 0, right: 0, top: 16, textAlign: "center", zIndex: 3, fontSize: "2.1rem", fontWeight: 600, color: "#437", textShadow: "0 2px 8px #fff, 0 2px 4px #bbb", letterSpacing: "0.03em" }}>
+      <div style={{
+        position: "fixed",
+        bottom: 20,
+        right: 20,
+        background: "#FAF3F0",
+        borderRadius: "16px",
+        padding: "14px 18px",
+        border: "2px solid #F8D4D8",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
+        display: "flex",
+        alignItems: "center",
+        gap: "14px"
+      }}>
+        <button
+          style={{
+            background: "#FDCEDF",
+            color: "#8B4D60",
+            border: "none",
+            borderRadius: "12px",
+            padding: "6px 14px",
+            fontWeight: 600,
+            fontSize: "1rem",
+            cursor: "pointer",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+          }}
+          onClick={() => {
+            if (!hasPlayedRef.current) {
+              const bgm = new Audio(bgmSrc);
+              bgm.loop = true;
+              bgm.volume = volume;
+              bgm.play().then(() => {
+                bgmRef.current = bgm;
+                hasPlayedRef.current = true;
+              }).catch(err => {
+                console.warn("手動再生失敗:", err);
+              });
+            } else if (bgmRef.current && !isPlaying) {
+              bgmRef.current.play().then(() => {
+                setIsPlaying(true);
+              }).catch(err => {
+                console.warn("再再生失敗:", err);
+              });
+          }}
+        }>
+          🎵 再生
+        </button>
+        <button
+          style={{
+            background: "#FDCEDF",
+            color: "#8B4D60",
+            border: "none",
+            borderRadius: "12px",
+            padding: "6px 14px",
+            fontWeight: 600,
+            fontSize: "1rem",
+            cursor: "pointer",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+          }}
+          onClick={() => {
+            if (bgmRef.current) {
+              bgmRef.current.pause();
+              bgmRef.current.currentTime = 0;
+              setIsPlaying(false);
+              hasPlayedRef.current = false;
+            }
+          }}
+        >
+          ⏹ 停止
+        </button>
+
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={volume}
+          onChange={(e) => {
+            const newVol = parseFloat(e.target.value);
+            setVolume(newVol);
+            if (bgmRef.current) {
+              bgmRef.current.volume = newVol;
+            }
+          }}
+          style={{
+            accentColor: "#F4A9B7",
+            height: "8px",
+            borderRadius: "6px"
+          }}
+        />
+      </div>
+
+      <div style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 16,
+        textAlign: "center",
+        zIndex: 3,
+        fontSize: "2.1rem",
+        fontWeight: 600,
+        color: "#437",
+        textShadow: "0 2px 8px #fff, 0 2px 4px #bbb",
+        letterSpacing: "0.03em"
+      }}>
         次は君に任せた！
       </div>
     </div>

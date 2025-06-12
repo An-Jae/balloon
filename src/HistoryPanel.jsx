@@ -1,4 +1,3 @@
-// HistoryPanel.js
 import React from "react";
 
 export default function HistoryPanel({ history }) {
@@ -11,43 +10,80 @@ export default function HistoryPanel({ history }) {
     return toMillis(b.createdAt) - toMillis(a.createdAt);
   });
 
+  const recent = sorted.slice(0, 5);
+
+  const nameCounts = history.reduce((acc, entry) => {
+    const name = entry.name ?? "（名前なし）";
+    acc[name] = (acc[name] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div style={{
-      background: "rgba(255,255,255,0.97)",
-      borderRadius: 8,
-      padding: "12px 16px",
+      background: "rgba(255,255,255,0.95)",
+      borderRadius: 12,
+      padding: "0px",
       boxShadow: "0 4px 16px #bbb3",
-      fontSize: "1.1rem",
+      fontSize: "0.85rem",
       color: "#B1558C",
-      minWidth: 200
+      minWidth: 300,
+      display: "flex",
+      justifyContent: "space-between",
+      gap: "24px"
     }}>
-      <div style={{ fontWeight: 700, marginBottom: 8 }}>最近当たった人</div>
-      {sorted.length === 0 ? (
-        <div style={{ color: "#aaa" }}>まだいません</div>
-      ) : (
-        sorted.map((n, i) => {
-          let date;
-          if (typeof n.createdAt === "string") {
-            date = new Date(Date.parse(n.createdAt));
-          } else if (n.createdAt?.seconds) {
-            date = new Date(n.createdAt.seconds * 1000);
-          } else {
-            date = null;
-          }
+      {/* 🔵 累積 */}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 400, marginBottom: 5 }}>🎯 名前別</div>
+        {Object.entries(nameCounts)
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, count], i) => (
+            <div key={i} style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontFamily: "monospace"
+            }}>
+              <span>・{name}</span>
+              <span>（{count}回）</span>
+            </div>
+        ))}
+      </div>
 
-          const formatted = date && !isNaN(date.getTime())
+      {/* 🟣 直近当たったメンバー */}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 400, marginBottom: 5 }}>🕓 最近</div>
+        {recent.length === 0 ? (
+          <div style={{ color: "#aaa" }}>まだいません</div>
+        ) : (
+          recent.map((n, i) => {
+            let date;
+            if (typeof n.createdAt === "string") {
+              date = new Date(Date.parse(n.createdAt));
+            } else if (n.createdAt?.seconds) {
+              date = new Date(n.createdAt.seconds * 1000);
+            } else {
+              date = null;
+            }
+
+            const formatted = date && !isNaN(date.getTime())
             ? date.toLocaleDateString("ja-JP", {
-                year: "numeric",
                 month: "2-digit",
                 day: "2-digit"
-              })
+              }) 
             : "不明";
 
-          return (
-            <div key={i}>・{n.name ?? '（名前なし）'}（{formatted}）</div>
-          );
-        })
-      )}
+            return (
+              <div key={i} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontFamily: "monospace"
+              }}>
+                <span>・{n.name ?? '（名前なし）'}</span>
+                <span>（{formatted}）</span>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

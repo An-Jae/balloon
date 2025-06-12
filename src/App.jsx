@@ -98,6 +98,7 @@ export default function App() {
   const [names, setNames] = useState([]);
   const [balloonPositions, setBalloonPositions] = useState([]);
   const [hitIdx, setHitIdx] = useState(null);
+  const bgmRef = useRef(null);
   const [showNote, setShowNote] = useState(false);
   const [arrowAnim, setArrowAnim] = useState(false);
   const [history, setHistory] = useState([]);
@@ -161,18 +162,28 @@ export default function App() {
 
   const shoot = async () => {
     if (hitIdx !== null || names.length === 0) return;
-    const audio = new Audio(`${import.meta.env.BASE_URL}whistle.mp3`);
-    audio.play();
-
+  
+    if (!bgmRef.current) {
+      const bgm = new Audio(`${import.meta.env.BASE_URL}whistle.mp3`);
+      bgm.loop = true;
+      bgm.volume = 0.4;
+      try {
+        await bgm.play();
+        bgmRef.current = bgm;
+      } catch (err) {
+        console.warn("BGM失敗:", err);
+      }
+    }
+  
+    const se = new Audio(`${import.meta.env.BASE_URL}arrow.mp3`);
+    se.volume = 0.6;
+    se.play();
+  
     const idx = Math.floor(Math.random() * names.length);
     setHitIdx(idx);
     setArrowAnim(true);
   
     setTimeout(async () => {
-      const se = new Audio(`${import.meta.env.BASE_URL}arrow.mp3`);
-      se.volume = 0.6;
-      se.play();
-      
       setArrowAnim(false);
       setShowNote(true);
       await addHistory(names[idx]);

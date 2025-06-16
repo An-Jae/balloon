@@ -5,11 +5,28 @@ import { addHistory, fetchHistory } from "./fireHistory";
 import HistoryPanel from "./HistoryPanel";
 import { fetchNames, addName, deleteName } from "./fireNames";
 import { clearAllHistory } from "./fireHistory";
+import FlyingCupid from "./components/FlyingCupid";
+
+function getAngle(x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+
+  let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+  // 🛠️ 이미지 기준 보정: 기본 상태에서 오른쪽 위 20° 바라보므로
+  angle -= 20;
+
+  // ✨ 회전 각도 -180~180 범위 유지
+  if (angle > 180) angle -= 360;
+  if (angle < -180) angle += 360;
+
+  return angle;
+}
 
 export function makeBalloonPositions(count) {
   return Array.from({ length: count }).map(() => ({
-    top: `${18 + Math.random() * 25}%`,
-    left: `${9 + Math.random() * 74}%`
+    top: `${10 + Math.random() * 60}%`,     // 높이: 10% ~ 70%
+    left: `${5 + Math.random() * 90}%`      // 좌우: 5% ~ 95%
   }));
 }
 
@@ -113,9 +130,16 @@ export default function App() {
   const [showNote, setShowNote] = useState(false);
   const [arrowAnim, setArrowAnim] = useState(false);
   const [history, setHistory] = useState([]);
+  const [showFlyingCupid, setShowFlyingCupid] = useState(false);
+  const [flyingCupidPos, setFlyingCupidPos] = useState({ x: 0, y: 0 });
+  const [cupidAngle, setCupidAngle] = useState(0);
+  const [shooting, setShooting] = useState(false);
+  const [cupidFlip, setCupidFlip] = useState(1);
+  const [cupidMove, setCupidMove] = useState({ x: 0, y: 0 });
   const balloonRefs = useRef([]);
   const cupidWidth = 140;
   const cupidHeight = 160;
+
 
   useEffect(() => {
     const loadNames = async () => {
@@ -186,7 +210,7 @@ export default function App() {
     const rect = cupidRef.current?.getBoundingClientRect();
     return rect
       ? { x: rect.left + rect.width * 0.2, y: rect.top + rect.height * 0.4 }
-      : { x: window.innerWidth / 2, y: window.innerHeight - 100 };
+      : { x: window.innerWidth / 2, y: window.innerHeight - 240 };
   };
 
   const getBalloonXY = (idx) => {
@@ -201,7 +225,37 @@ export default function App() {
 
   const shoot = async () => {
     if (hitIdx !== null || names.length === 0) return;
-
+  
+    const idx = Math.floor(Math.random() * names.length);
+    const cupidPos = getCupidXY();
+    const balloonPos = getBalloonXY(idx);
+  
+    const dx = balloonPos.x - cupidPos.x;
+    const dy = balloonPos.y - cupidPos.y;
+  
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI) - 20;
+  
+    // ✅ 좌우 반전 판단
+    const flip = dx < 0 ? -1 : 1;
+    setCupidFlip(flip);
+  
+    // ✨ scaleX -1일 경우 angle을 반대로 보정해야 시선 일치
+    if (flip === -1) {
+      angle = angle + 180;
+      if (angle > 180) angle -= 360;
+    }
+  
+    setCupidAngle(angle);
+  
+    setCupidMove({
+      x: dx * 0.1,
+      y: dy * 0.1
+    });
+  
+    setShooting(true);
+    setArrowAnim(true);
+    setHitIdx(idx);
+  
     if (!bgmRef.current) {
       const bgm = new Audio(`${import.meta.env.BASE_URL}whistle.mp3`);
       bgm.loop = true;
@@ -213,16 +267,17 @@ export default function App() {
         console.warn("BGM 실패", err);
       }
     }
-
-    const idx = Math.floor(Math.random() * names.length);
-    setHitIdx(idx);
+  
     setArrowAnim(true);
-
+    setHitIdx(idx); // ✅ 여기서 단 한 번만 호출
+  
+    setTimeout(() => setShowFlyingCupid(false), 1600);
+  
     setTimeout(async () => {
       const se = new Audio(`${import.meta.env.BASE_URL}arrow.mp3`);
       se.volume = 0.6;
       se.play();
-
+  
       setArrowAnim(false);
       setShowNote(true);
       await addHistory(names[idx]);
@@ -326,7 +381,12 @@ export default function App() {
       )}
 
       <Arrow show={arrowAnim && hitIdx !== null} start={arrowStart} end={arrowEnd} />
-
+      <FlyingCupid
+  show={showFlyingCupid}
+  x={flyingCupidPos.x}
+  y={flyingCupidPos.y}
+  angle={flyingCupidPos.angle || 0}
+/>
 
 
       <motion.div
@@ -338,19 +398,43 @@ export default function App() {
           zIndex: 3,
           width: cupidWidth,
           height: cupidHeight,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "right",
           pointerEvents: "auto",
-          cursor: hitIdx === null && names.length > 0 ? "pointer" : "not-allowed"
+          cursor: hitIdx === null && names.length > 0 ? "pointer" : "not-allowed",
         }}
-        animate={{ x: [0, -70, 70, 0], y: [0, -8, -14, 0], rotate: [0, -6, 6, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        animate={{
+          scale: shooting ? [1, 1.5, 1] : 1,
+          x: shooting ? cupidMove.x : [0, -70, 70, 0],
+          y: shooting ? cupidMove.y : [0, -8, -14, 0],
+        }}
+        transition={{
+          duration: shooting ? 1.3 : 8,
+          repeat: shooting ? 0 : Infinity,
+          ease: "easeInOut"
+        }}
         onClick={shoot}
         title="キューピッドをクリックして矢を放とう！"
+        onAnimationComplete={() => {
+          setShooting(false);
+          setCupidMove({ x: 0, y: 0 });
+        }}
       >
-        <img ref={cupidRef} src={`${import.meta.env.BASE_URL}cupid.png`} alt="キューピッド" style={{ width: cupidWidth, height: cupidHeight, objectFit: "contain", pointerEvents: "none", userSelect: "none" }} draggable={false} />
+        <img
+          ref={cupidRef}
+          src={`${import.meta.env.BASE_URL}cupid.png`}
+          alt="キューピッド"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            transform: `rotate(${cupidAngle}deg) ${cupidFlip === -1 ? "scaleX(-1)" : ""}`,
+            transformOrigin: "center center",
+            transition: "transform 0.4s ease-out"
+          }}
+          draggable={false}
+        />
       </motion.div>
+
+
 
       <div style={{ position: "fixed", left: 16, bottom: 24, zIndex: 10 }}>
         <HistoryPanel history={history} />

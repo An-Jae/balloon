@@ -223,67 +223,161 @@ export default function App() {
     };
   };
 
-  const shoot = async () => {
-    if (hitIdx !== null || names.length === 0) return;
-  
-    const idx = Math.floor(Math.random() * names.length);
-    const cupidPos = getCupidXY();
-    const balloonPos = getBalloonXY(idx);
-  
-    const dx = balloonPos.x - cupidPos.x;
-    const dy = balloonPos.y - cupidPos.y;
-  
-    let angle = Math.atan2(dy, dx) * (180 / Math.PI) - 20;
-  
-    // ✅ 좌우 반전 판단
-    const flip = dx < 0 ? -1 : 1;
-    setCupidFlip(flip);
-  
-    // ✨ scaleX -1일 경우 angle을 반대로 보정해야 시선 일치
-    if (flip === -1) {
-      angle = angle + 180;
-      if (angle > 180) angle -= 360;
+    // 日本語コメント: 当選履歴から名前ごとの当選回数を集計
+  const buildWinCountMap = (historyList) => {
+    const map = new Map();
+
+    for (const item of historyList || []) {
+      const name = item?.name;
+      if (!name) continue;
+      map.set(name, (map.get(name) || 0) + 1);
     }
-  
-    setCupidAngle(angle);
-  
-    setCupidMove({
-      x: dx * 0.1,
-      y: dy * 0.1
+
+    console.debug("[weighted-draw] winCountMap", Object.fromEntries(map));
+    return map;
+  };
+
+  // 日本語コメント: 当選回数が多い人ほど当たりにくくする重み付き抽選
+  const pickWeightedIndex = (namesList, historyList, penaltyFactor = 0.7) => {
+    if (!namesList || namesList.length === 0) {
+      console.warn("[weighted-draw] namesList is empty");
+      return -1;
+    }
+
+    const winCountMap = buildWinCountMap(historyList);
+
+    const weighted = namesList.map((person, index) => {
+      const winCount = winCountMap.get(person.name) || 0;
+      const weight = 1 / (1 + winCount * penaltyFactor);
+
+      return {
+        index,
+        id: person.id,
+        name: person.name,
+        winCount,
+        weight,
+      };
     });
-  
-    setShooting(true);
-    setArrowAnim(true);
-    setHitIdx(idx);
-  
-    if (!bgmRef.current) {
-      const bgm = new Audio(`${import.meta.env.BASE_URL}whistle.mp3`);
-      bgm.loop = true;
-      bgm.volume = 0.4;
-      try {
-        await bgm.play();
-        bgmRef.current = bgm;
-      } catch (err) {
-        console.warn("BGM 실패", err);
+
+    const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+
+    if (totalWeight <= 0) {
+      console.warn("[weighted-draw] totalWeight <= 0, fallback random");
+      return Math.floor(Math.random() * namesList.length);
+    }
+
+    let r = Math.random() * totalWeight;
+
+    for (const item of weighted) {
+      r -= item.weight;
+      if (r <= 0) {
+        console.debug("[weighted-draw] picked", {
+          pickedIndex: item.index,
+          pickedId: item.id,
+          pickedName: item.name,
+          pickedWinCount: item.winCount,
+          pickedWeight: item.weight,
+          totalWeight,
+          weighted,
+        });
+        return item.index;
       }
     }
-  
-    setArrowAnim(true);
-    setHitIdx(idx); // ✅ 여기서 단 한 번만 호출
-  
-    setTimeout(() => setShowFlyingCupid(false), 1600);
-  
-    setTimeout(async () => {
-      const se = new Audio(`${import.meta.env.BASE_URL}arrow.mp3`);
-      se.volume = 0.6;
-      se.play();
-  
-      setArrowAnim(false);
-      setShowNote(true);
-      await addHistory(names[idx]);
-      const updated = await fetchHistory();
-      setHistory(updated);
-    }, 3000);
+
+    // 日本語コメント: 浮動小数点誤差対策
+    const fallback = weighted[weighted.length - 1].index;
+    console.debug("[weighted-draw] fallback last index", {
+      fallback,
+      totalWeight,
+      weighted,
+    });
+    return fallback;
+  };
+
+    const shoot = async () => {
+    try {
+      if (hitIdx !== null || names.length === 0) return;
+
+      // 日本語コメント: 当選回数が多い人ほど当たりにくくする重み付き抽選
+      const idx = pickWeightedIndex(names, history, 0.7);
+      if (idx < 0) {
+        console.warn("[weighted-draw] invalid idx");
+        return;
+      }
+
+      console.debug("[weighted-draw] final selected", {
+        idx,
+        id: names[idx]?.id,
+        name: names[idx]?.name,
+      });
+
+      const cupidPos = getCupidXY();
+      const balloonPos = getBalloonXY(idx);
+
+      const dx = balloonPos.x - cupidPos.x;
+      const dy = balloonPos.y - cupidPos.y;
+
+      let angle = Math.atan2(dy, dx) * (180 / Math.PI) - 20;
+
+      // 日本語コメント: 左右反転判定
+      const flip = dx < 0 ? -1 : 1;
+      setCupidFlip(flip);
+
+      // 日本語コメント: scaleX=-1 の場合は角度補正
+      if (flip === -1) {
+        angle = angle + 180;
+        if (angle > 180) angle -= 360;
+      }
+
+      setCupidAngle(angle);
+
+      setCupidMove({
+        x: dx * 0.1,
+        y: dy * 0.1,
+      });
+
+      setShooting(true);
+      setArrowAnim(true);
+      setHitIdx(idx);
+
+      if (!bgmRef.current) {
+        const bgm = new Audio(`${import.meta.env.BASE_URL}whistle.mp3`);
+        bgm.loop = true;
+        bgm.volume = 0.4;
+        try {
+          await bgm.play();
+          bgmRef.current = bgm;
+        } catch (err) {
+          console.warn("BGM 失敗", err);
+        }
+      }
+
+      setTimeout(() => {
+        setShowFlyingCupid(false);
+      }, 1600);
+
+      setTimeout(async () => {
+        const se = new Audio(`${import.meta.env.BASE_URL}arrow.mp3`);
+        se.volume = 0.6;
+        se.play();
+
+        setArrowAnim(false);
+        setShowNote(true);
+
+        // 日本語コメント: 履歴保存（ログ確認用）
+        console.debug("[history] add", {
+          id: names[idx]?.id,
+          name: names[idx]?.name,
+        });
+
+        await addHistory(names[idx]);
+        const updated = await fetchHistory();
+        setHistory(updated);
+      }, 3000);
+
+    } catch (e) {
+      console.error("[weighted-draw] shoot failed", e);
+    }
   };
 
   const handleCloseNote = () => {
@@ -387,8 +481,6 @@ export default function App() {
   y={flyingCupidPos.y}
   angle={flyingCupidPos.angle || 0}
 />
-
-
       <motion.div
         style={{
           position: "fixed",
@@ -477,6 +569,7 @@ export default function App() {
               bgm.play().then(() => {
                 bgmRef.current = bgm;
                 hasPlayedRef.current = true;
+                setIsPlaying(true);
               }).catch(err => {
                 console.warn("手動再生失敗:", err);
               });
@@ -486,8 +579,9 @@ export default function App() {
               }).catch(err => {
                 console.warn("再再生失敗:", err);
               });
+            }
           }}
-        }>
+        >
           🎵 再生
         </button>
         <button
@@ -548,7 +642,7 @@ export default function App() {
         textShadow: "0 2px 8px #fff, 0 2px 4px #bbb",
         letterSpacing: "0.03em"
       }}>
-        次は君に任せた！
+        次回！よろし〜くお願いし〜ます！
       </div>
     </div>
   );

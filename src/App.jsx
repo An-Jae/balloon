@@ -13,10 +13,10 @@ function getAngle(x1, y1, x2, y2) {
 
   let angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-  // 🛠️ 이미지 기준 보정: 기본 상태에서 오른쪽 위 20° 바라보므로
+  // 🛠️ 画像基準の補正：デフォルト状態で右上20°を向いているため
   angle -= 20;
 
-  // ✨ 회전 각도 -180~180 범위 유지
+  // ✨ 回転角度を -180~180 の範囲に維持
   if (angle > 180) angle -= 360;
   if (angle < -180) angle += 360;
 
@@ -25,8 +25,8 @@ function getAngle(x1, y1, x2, y2) {
 
 export function makeBalloonPositions(count) {
   return Array.from({ length: count }).map(() => ({
-    top: `${10 + Math.random() * 60}%`,     // 높이: 10% ~ 70%
-    left: `${5 + Math.random() * 90}%`      // 좌우: 5% ~ 95%
+    top: `${10 + Math.random() * 60}%`,     // 高さ: 10% ~ 70%
+    left: `${5 + Math.random() * 90}%`      // 左右: 5% ~ 95%
   }));
 }
 

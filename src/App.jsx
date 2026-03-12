@@ -223,7 +223,7 @@ export default function App() {
     };
   };
 
-    // 日本語コメント: 当選履歴から名前ごとの当選回数を集計
+    // 当選履歴から名前ごとの当選回数を集計
   const buildWinCountMap = (historyList) => {
     const map = new Map();
 
@@ -237,7 +237,7 @@ export default function App() {
     return map;
   };
 
-  // 日本語コメント: 当選回数が多い人ほど当たりにくくする重み付き抽選
+  // 当選回数が多い人ほど当たりにくくする重み付き抽選
   const pickWeightedIndex = (namesList, historyList, penaltyFactor = 0.7) => {
     if (!namesList || namesList.length === 0) {
       console.warn("[weighted-draw] namesList is empty");
@@ -284,7 +284,7 @@ export default function App() {
       }
     }
 
-    // 日本語コメント: 浮動小数点誤差対策
+    // 浮動小数点誤差対策
     const fallback = weighted[weighted.length - 1].index;
     console.debug("[weighted-draw] fallback last index", {
       fallback,
@@ -298,7 +298,7 @@ export default function App() {
     try {
       if (hitIdx !== null || names.length === 0) return;
 
-      // 日本語コメント: 当選回数が多い人ほど当たりにくくする重み付き抽選
+      // 当選回数が多い人ほど当たりにくくする重み付き抽選
       const idx = pickWeightedIndex(names, history, 0.7);
       if (idx < 0) {
         console.warn("[weighted-draw] invalid idx");
@@ -319,11 +319,11 @@ export default function App() {
 
       let angle = Math.atan2(dy, dx) * (180 / Math.PI) - 20;
 
-      // 日本語コメント: 左右反転判定
+      // 左右反転判定
       const flip = dx < 0 ? -1 : 1;
       setCupidFlip(flip);
 
-      // 日本語コメント: scaleX=-1 の場合は角度補正
+      // scaleX=-1 の場合は角度補正
       if (flip === -1) {
         angle = angle + 180;
         if (angle > 180) angle -= 360;
@@ -364,7 +364,7 @@ export default function App() {
         setArrowAnim(false);
         setShowNote(true);
 
-        // 日本語コメント: 履歴保存（ログ確認用）
+        // 履歴保存（ログ確認用）
         console.debug("[history] add", {
           id: names[idx]?.id,
           name: names[idx]?.name,
